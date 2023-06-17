@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using DefaultNamespace;
 using Sim.Need;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
+using UnityEngine.XR;
 
 namespace Sim
 {
@@ -31,18 +33,28 @@ namespace Sim
         
         [SerializeField] private NavMeshAgent agent;
         [SerializeField] private Animator animator;
+        [SerializeField] private AnimationEventDispatcher animationEventDispatcher;
         [SerializeField] private List<SimNeedContainer> simNeedsData;
 
+        public event Action<NeedType> OnNeedFullfilled;
+        
         private List<SimNeed> simNeeds;
 
         private Transform target;
         private SimState currentState;
         private SimState nextState;
-        
-        public void SetTarget(Transform target)
+
+        public void InvokeSimNeed(NeedType need, Transform target)
         {
-            this.target = target;
-            agent.SetDestination(target.position);
+            nextState = need switch
+            {
+                NeedType.Food => SimState.Eating,
+                NeedType.Sleep => SimState.Sleeping,
+                NeedType.LookAtOwner => SimState.LookingAt,
+                _ => nextState
+            };
+
+            SetTarget(target);
         }
         
         private void Start()
@@ -52,6 +64,21 @@ namespace Sim
             foreach (var needData in simNeedsData)
             {
                 InitializeSimNeed(needData);
+            }
+
+            animationEventDispatcher.OnAnimationTriggered += OnAnimationTriggered;
+        }
+
+        private void OnAnimationTriggered(string animationName)
+        {
+            switch (animationName)
+            {
+                case "OnEatingEnded":
+                    OnNeedFullfilled?.Invoke(NeedType.Food);
+                    break;
+                case "OnSleepingEnded":
+                    OnNeedFullfilled?.Invoke(NeedType.Sleep);
+                    break;
             }
         }
 
@@ -87,6 +114,12 @@ namespace Sim
             HandleCurrentState();
         }
 
+        private void SetTarget(Transform target)
+        {
+            this.target = target;
+            agent.SetDestination(target.position);
+        }
+
         private void HandleCurrentState()
         {
             switch (currentState)
@@ -94,9 +127,23 @@ namespace Sim
                 case SimState.Walking:
                     if (DoWalk())
                     {
-                        
+                        HandleNextState();
                     }
-                    
+                    break;
+                case SimState.Eating:
+
+                    break;
+            }
+        }
+
+        private void HandleNextState()
+        {
+            currentState = nextState;
+            
+            switch (currentState)
+            {
+                case SimState.Eating:
+                    animator.SetTrigger(AnimationConstants.Eat);
                     break;
             }
         }

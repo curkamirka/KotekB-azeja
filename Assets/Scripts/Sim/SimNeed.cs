@@ -1,7 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using DefaultNamespace;
 using Sim.Need;
 using UnityEngine;
 using UnityEngine.UI;
+using Object = UnityEngine.Object;
 
 namespace Sim
 {
@@ -18,6 +22,8 @@ namespace Sim
         public abstract NeedType NeedType { get; }
         public bool NeedsResolving => currentValue <= needData.ReactionValue;
 
+        private List<ActionResolverTargetController> actionResolverTargets;
+
         protected SimController simController;
         protected SimNeedData needData;
         protected Slider slider;
@@ -31,8 +37,19 @@ namespace Sim
             
             currentValue = needData.MaxValue;
             UpdateSlider();
+
+            actionResolverTargets = Object.FindObjectsOfType<ActionResolverTargetController>()
+                .Where(x => x.NeedType == NeedType).ToList();
+
+            simController.OnNeedFullfilled += SimController_OnNeedFullfilled;
         }
-        
+
+        private void SimController_OnNeedFullfilled(NeedType needType)
+        {
+            if (needType == NeedType)
+                currentValue = needData.MaxValue;
+        }
+
         public virtual void Update()
         {
             currentValue -= needData.DecrementValue;
@@ -41,6 +58,11 @@ namespace Sim
         }
 
         public abstract void Resolve();
+
+        protected Transform FindClosestSource()
+        {
+            return actionResolverTargets.OrderBy(x => Vector3.Distance(x.transform.position, simController.transform.position)).First().transform;
+        }
 
         private void UpdateSlider()
         {

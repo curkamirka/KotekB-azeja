@@ -6,7 +6,8 @@
         
         public override void Resolve()
         {
-            
+            var closestSource = FindClosestSource();
+            simController.InvokeSimNeed(NeedType, closestSource);
         }
     }
 }
